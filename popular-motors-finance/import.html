@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Data Import - Popular Motors Finance</title>
+<style>
+    body { font-family: Arial, sans-serif; background: #0b162c; color: white; display: flex; align-items: center; justify-content: center; min-height: 100vh; flex-direction: column; }
+    .box { background: #1a2a44; padding: 40px; border-radius: 16px; max-width: 500px; text-align: center; }
+    h2 { color: #e5a93b; margin-bottom: 10px; }
+    p { color: #aaa; margin-bottom: 24px; }
+    button { background: #e5a93b; color: #0b162c; border: none; padding: 14px 32px; font-size: 1.1rem; font-weight: 700; border-radius: 8px; cursor: pointer; }
+    button:hover { background: #f0bf55; }
+    .status { margin-top: 20px; color: #22c55e; font-weight: 600; font-size: 1.1rem; display: none; }
+    .warn { color: #ef4444; font-size:0.9rem; margin-top:10px; }
+</style>
+</head>
+<body>
+<div class="box">
+    <h2>📦 Import Historical Data</h2>
+    <p>Loads all <strong>47 customers</strong> from your P.J. FIN.EASE records — including Borrower Address, Guarantor Name, Phone, and Address.</p>
+    <p class="warn">⚠️ Run only ONCE. Duplicate vehicle numbers will be skipped automatically.</p>
+    <button onclick="importData()">Import All 47 Customers</button>
+    <div class="status" id="status">✅ 47 Customers Imported! Redirecting...</div>
+</div>
+
+<script>
+const STORAGE_KEY = 'popular_motors_crm';
+
+/*
+  Format per row:
+  [
+    customerName, vehicleNumber, borrowerPhone, startDate,
+    emi, tenureMonths, outstanding,
+    borrowerAddress,
+    guarantorName, guarantorPhone, guarantorAddress
+  ]
+*/
+const rawCustomers = [
+  [
+    "Mohammed Ameer V", "KL-32G-5092", "9944591733", "2022-06-30", 3440, 30, 64000,
+    "Mannavil House, Valiyakunnu PO, Malappuram 679325",
+    "Azad Salem", "9048318340", "Harithu, Pulikkal Post, Madakkul, Kolathur PO, Malappuram"
+  ],
+  [
+    "Sugunan", "KL-33G-5178", "9447221749", "2022-08-31", 3804, 60, 25000,
+    "Varikkaparambil House, Mukkam Via PO, Kozhikode",
+    "Noushad P", "9605881577", "Varikkaparambil House, Mukkam Via, Kozhikode"
+  ],
+  [
+    "Mohammed Shameem PT", "KL-12K-2961", "7064080279", "2022-11-20", 30200, 12, 161000,
+    "Shobha Manzil, Pulliyil Road House, Mammutha, Malappuram",
+    "Sintha Hameed", "9444471241", "Abdu Manzil, Pulliyil Road, Mammutha, Malappuram"
+  ],
+  [
+    "Prakash K", "KL-47CL-5528", "9488528547", "2023-09-15", 29460, 20, 127250,
+    "Tholkappura House, Pondilkuris, Thirunavaya, Malappuram",
+    "Hameed", "9016158917", "Tholkappura House, Pondilkuris, Thirunavaya"
+  ],
+  [
+    "Abdulhy", "KL-63T-5475", "9948154158", "2023-04-28", 30300, 20, 60000,
+    "Pattanad House, Kozhikode 673021",
+    "Mohammed Jaseer", "9496180269", "Pattanad House, Kozhikode 673021"
+  ],
+  [
+    "Ansar", "KL-53M-8412", "6282772390", "2023-04-28", 18000, 30, 76000,
+    "Ulttampara House, Kozhikode PO, Kozhikode 673001",
+    "Azad Nazar", "9633657272", "Usman Manzil, Ulttampara House, Kozhikode"
+  ],
+  [
+    "Ahammed Nabeeb N", "KL-32N-0862", "7994513223", "2023-08-31", 28000, 20, 264000,
+    "Naushad House, Perinthalmanna, Mannarkkad, Malappuram",
+    "Ahammed Nabeeb Najit H", "9845413225", "Naushad House, Perinthalmanna, Mannarkkad"
+  ],
+  [
+    "Abdul Salher", "KL-53H-3897", "7793594781", "2023-03-13", 9070, 13, 38062,
+    "Kottichattachal House, Sikandhar Puram, Kozhikode",
+    "Sarah M", "9844413223", "Kottichattachal House, Sikandhar Puram, Kozhikode"
+  ],
+  [
+    "Damoosh P", "KL-8548-2461", "9074568439", "2023-11-21", 35500, 12, 45000,
+    "Roshanchundal Vail, Ponnurangam Mahal, Calicut, Kozhikode",
+    "Azad Azees P", "9547449230", "Hariyahil House, Kozhikode"
+  ],
+  [
+    "Channavon Jesse", "KL-11-6722", "9400489500", "2024-02-23", 28200, 4, 33000,
+    "Aboobaker, Cheravath House, Thevanary, Nilambur, Malappuram",
+    "Q Aboobaker", "9400489508", "Cheravath House, Thevanary, Nilambur"
+  ],
+  [
+    "Biji Rajendran", "KL-13T-8767", "9644182460", "2023-03-03", 11500, 25, 127500,
+    "Thadakath House, Thirukumaradi, Pukattanam, Palakkad",
+    "Rajendran TK", "9447544259", "Thadakath House, Thirukumaradi, Pukattanam, Palakkad"
+  ],
+  [
+    "Sadali", "KL-53G-6852", "9532008398", "2023-11-19", 5800, 20, 50950,
+    "Panchayat House, Angadippalam, Perinthalmanna, Malappuram",
+    "Abdul Rasheed CP", "9048280253", "Abin Horizon House, Chelamala, Koduvayur, Palakkad"
+  ],
+  [
+    "Abdul Azees", "KL-32E-0311", "7034944024", "2024-02-23", 5000, 20, 42500,
+    "Azhimattath House, Ponnaleri, Perinthalmanna, Malappuram",
+    "Mohammed Ahamed", "7034610688", "Azhimattath House, Ponnaleri, Malappuram"
+  ],
+  [
+    "Adees", "KL-10B8-8883", "6238043128", "2023-08-05", 35000, 23, 135000,
+    "Abin Manzil, Perinthalmanna, Malappuram",
+    "Arwad", "9049428028", "Perinthalmanna, Malappuram"
+  ],
+  [
+    "Salaudeen PT", "KL-63F-4455", "9448159176", "2023-11-19", 12000, 40, 600000,
+    "Mohammed Kutty, Pilliyayl Thad House, Narangaparamba, Kozhikode",
+    "Azaan Rahman PT", "9048694514", "Narangaparamba, Kozhikode"
+  ],
+  [
+    "Mohammed Jameel", "KL-45N-0836", "9947311380", "2023-11-19", 34760, 20, 251000,
+    "Abdul Hameed, Ponnad House, Perinthalmanna, Malappuram",
+    "Mohammed Jameel", "8696148189", "Ponnad House, Perinthalmanna, Malappuram"
+  ],
+  [
+    "Mohammed Ameer Adeeb", "KL-45B-8894", "9947211180", "2023-05-29", 5480, 20, 28000,
+    "Alathiyar, Pottukaad House, Panni, Ramapur, Kozhikode 678500",
+    "Mohammed", "9947211185", "Pottukaad House, Panni, Ramapur, Kozhikode"
+  ],
+  [
+    "Mohammed Azeez", "KL-54B-0069", "9846321000", "2024-01-21", 5880, 20, 47000,
+    "Abdu Hameed, Parakkat House, Perinthalmanna, Malappuram",
+    "Nabreth", "9846128778", "Parakkat House, Perinthalmanna, Malappuram"
+  ],
+  [
+    "Rasheekhan", "KL-45B-2553", "9947261525", "2023-12-13", 22550, 27, 298000,
+    "Abdul Hameed P, Kottachira House, Kachurkattu PO, Ramapur, Kozhikode 678500",
+    "Arrow EA", "9040407171", "Kottachira House, Kachurkattu PO, Kozhikode"
+  ],
+  [
+    "Adeen", "KL-10B5-1641", "9048854158", "2024-11-06", 11400, 19, 148200,
+    "Perinthalmanna, Malappuram",
+    "Mohammed Alimikar", "9448192471", "Adheekkar House, Peapidi PO, Kootamal 679325"
+  ],
+  [
+    "Farukt Ardelem", "KL-67B-3392", "9048780988", "2024-12-21", 14200, 19, 85200,
+    "Vadangan, Chindakudu, Kozhikode",
+    "Ahammed Iqbal", "8048190524", "Vedangan, Chindakudu, Kozhikode"
+  ],
+  [
+    "Abdul Hakeem C", "KL-11F-0177", "9946398593", "2025-01-18", 14000, 11, 136000,
+    "Perinthalmanna, Malappuram",
+    "Athaf P", "9448402209", "Perinthalmanna, Malappuram"
+  ],
+  [
+    "Thoufan", "KL-53M-8533", "9745353525", "2024-12-03", 28500, 27, 289000,
+    "Kondappel House, Peravallur, Perinthalmanna, Malappuram",
+    "Hyderdali VP", "9546459454", "Peravallur, Perinthalmanna, Malappuram"
+  ],
+  [
+    "Muhammed Ahigar", "KL-47B-8818", "9048199389", "2025-01-18", 13000, 11, 111000,
+    "Perinthalmanna, Malappuram",
+    "Ahwad Ahammed", "9946398593", "Perinthalmanna, Malappuram"
+  ],
+  [
+    "Mukhtar FA", "KL-53J-2340", "8208786396", "2025-03-29", 23500, 25, 71700,
+    "Perinthalmanna, Malappuram",
+    "Ahammed Shammas", "6134511300", "Perinthalmanna, Malappuram"
+  ],
+  [
+    "Rasheed", "KL-53K-4997", "9995611390", "2023-12-07", 5340, 18, 54400,
+    "Mohammed Kutty, Kanjipalli House, Pulikkal, Malappuram",
+    "Mohammed Shifeen", "8606024159", "Kolottara House, Pulikkal, Malappuram"
+  ],
+  [
+    "Ahamed", "KL-41B-5457", "7719480145", "2023-12-14", 5000, 12, 35000,
+    "Mohammed Husain, Kangarigal House, Angadippalam, Perinthalmanna",
+    "Mohammed Ahamedali", "7719480140", "Kangarigal House, Angadippalam, Perinthalmanna"
+  ],
+  [
+    "Soran Babu", "KL-67F-7862", "7796321177", "2024-04-27", 29000, 11, 162000,
+    "Perinthalmanna, Malappuram",
+    "Manaveli V", "9846128778", "Perinthalmanna, Malappuram"
+  ],
+  [
+    "Sajith", "KL-85G-0024", "9544520593", "2025-02-01", 21000, 14, 134400,
+    "Perinthalmanna, Malappuram",
+    "Ahammed Masenin", "9747132796", "Perinthalmanna, Malappuram"
+  ],
+  [
+    "Sooran Babu", "KL-53M-6199", "9440138025", "2025-01-01", 28000, 12, 60000,
+    "Allah Valiyam, Kangarigal House, Angadippalam, Perinthalmanna, Malappuram",
+    "Allah Valiyam", "9440138026", "Kangarigal House, Angadippalam, Perinthalmanna"
+  ],
+  [
+    "Sofuitu", "KL-53M-4813", "9745180396", "2025-04-21", 5700, 13, 22800,
+    "Thombora, Orugan, Perinthalmanna, Malappuram",
+    "Arounam", "9745180390", "Thombora, Orugan, Perinthalmanna, Malappuram"
+  ],
+  [
+    "Hameed", "KL-8848-5860", "9480021178", "2025-08-21", 12750, 13, 89250,
+    "Seeja Hajj, Chamunath House, Perinthalmanna, Malappuram",
+    "Sinidho Hameed", "8714694848", "Mohammed, Faluyan Road, Pallatheri, Malappuram"
+  ],
+  [
+    "Uwan Rasheed PT", "KL-10AP-6161", "9848140797", "2025-02-14", 11500, 13, 69000,
+    "Simon Puza, Saikumari House, Aachanallur, Perinthalmanna, Malappuram 679322",
+    "Jayakar", "9844439858", "Gayuri, Kunnath House, Saikumari, Perinthalmanna"
+  ],
+  [
+    "Sreekumar T", "KL-10BA-4004", "6380066380", "2025-08-13", 17000, 11, 137000,
+    "Balakrishan, Thinkath House, Karangapour, Villur, Palakkad 679385",
+    "Sohn M", "6380777245", "Saminur, Thinkath House, Karangapour, Villur, Palakkad"
+  ],
+  [
+    "Shameen Hashier", "KL-65R-0485", "9946449376", "2025-09-19", 11500, 8, 46000,
+    "Anwara PS, Pattabiram House, Pattabiram PO, Malappuram",
+    "Azimad EX", "9445181960", "Kalakkapad House, Pattabiram PO, Malappuram"
+  ],
+  [
+    "Suliyan", "KL-58K-4838", "9946128998", "2025-11-22", 9302, 11, 51000,
+    "Ganar, Mannapelly House, Vadallur, Malappuram 679326",
+    "Suliyan Guarantor", "9946128000", "Mannapelly House, Vadallur, Malappuram"
+  ],
+  [
+    "Vigen VK", "KL-58K-4216", "9080377190", "2026-06-23", 9202, 8, 24600,
+    "Sundown, Merangod House, Cherambi, Kozhikode",
+    "Saneen KD", "8614518102", "Merangod House, Cherambi, Kozhikode"
+  ],
+  [
+    "Adalkan", "KL-61BV-0975", "7741801111", "2025-04-12", 41500, 8, 166000,
+    "Perinthalmanna, Malappuram",
+    "Mohammed C Hameed", "9048890334", "Perinthalmanna, Malappuram"
+  ],
+  [
+    "Hamid", "KL-47W-0133", "9745230122", "2023-10-24", 17700, 24, 354000,
+    "Abdul Gaffer, Kulaminla House, Angadippalam, Malappuram",
+    "Azad Gaffer", "6929797177", "Kulaminla House, Angadippalam, Malappuram"
+  ],
+  [
+    "Sharafutheen", "KL-45D-3156", "9902147062", "2023-07-19", 17850, 5, 53550,
+    "Perinthalmanna, Malappuram",
+    "Haas", "6138779261", "Perinthalmanna, Malappuram"
+  ],
+  [
+    "Arnow EA", "KL-53L-0313", "9888772099", "2022-03-12", 28500, 8, 60000,
+    "Hazer Kally, Edavanmuud House, Peravallur, Perinthalmanna",
+    "Sindhu Hameed", "9844407141", "Abdu Manzil, Pulliyil Road, Mammutha, Malappuram"
+  ],
+  [
+    "Sreemann", "KL-53N-6053", "9840015170", "2022-06-12", 28500, 4, 67000,
+    "Navreen House, Kondappal, Peravallur, Perinthalmanna",
+    "Kothan", "9840015175", "Kondappal House, Peravallur, Perinthalmanna"
+  ],
+  [
+    "Mohammed Ashraf", "KL-57W-W193", "9948122169", "2026-06-12", 9460, 13, 33000,
+    "Perinthalmanna, Malappuram",
+    "Kothan", "7348339250", "Perinthalmanna, Malappuram"
+  ],
+  [
+    "Naveen", "KL-53M-6293", "9748353525", "2025-12-28", 28500, 11, 67000,
+    "Kondappal House, Peravallur, Perinthalmanna",
+    "Hyderdali VP", "9845450154", "Peravallur, Perinthalmanna, Malappuram"
+  ],
+  [
+    "Mohammed Ibrahim CK", "KL-53M-4551", "9745503046", "2022-05-30", 58000, 5, 117000,
+    "Mohammed Kutty, Cheruvathil House, Cheruvathil N Kolam PO, Mannarkkad, Kozhikode 678550",
+    "Lines C", "9748353525", "Cheruvathil House, Mannarkkad, Kozhikode"
+  ],
+  [
+    "Mohammed Husain", "KL-53Q-4001", "9745503025", "2026-01-05", 31250, 4, 62500,
+    "Perinthalmanna, Malappuram",
+    "Mohammed Husain Guarantor", "9745503020", "Perinthalmanna, Malappuram"
+  ],
+  [
+    "Lines X", "KL-53L-9257", "9748353125", "2026-09-09", 31250, 4, 62500,
+    "Naveen, Kondappal House, Peravallur, Perinthalmanna",
+    "Hyderdali VP", "9644430958", "Peravallur, Perinthalmanna, Malappuram"
+  ],
+];
+
+function importData() {
+    const existing = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+    const existingVehicles = new Set(existing.map(r => r.vehicleNumber));
+
+    const now = Date.now();
+    let count = 0;
+
+    rawCustomers.forEach((row, index) => {
+        const [
+            name, vehicle, phone, startDate, emi, tenure, outstanding,
+            borrowerAddress,
+            guarantorName, guarantorPhone, guarantorAddress
+        ] = row;
+
+        if (existingVehicles.has(vehicle)) return;
+
+        const rate = 0.015;
+        const totalPayable = emi * tenure;
+        const loanAmount = Math.round(totalPayable / (1 + rate * tenure));
+        const historicalPaid = Math.max(0, totalPayable - outstanding);
+
+        const record = {
+            id: now + index,
+            timestamp: now + index,
+            customerName: name,
+            mobileNumber: phone,
+            vehicleNumber: vehicle,
+            borrowerAddress: borrowerAddress || '',
+            guarantorName: guarantorName || '',
+            guarantorPhone: guarantorPhone || '',
+            guarantorAddress: guarantorAddress || '',
+            startDate,
+            loanAmount,
+            tenureMonths: tenure,
+            rate,
+            emi,
+            totalPayable,
+            payments: [],
+            lateFees: []
+        };
+
+        if (historicalPaid > 0) {
+            record.payments.push({
+                id: now + index + 10000,
+                amount: historicalPaid,
+                date: startDate,
+                type: 'Historical Balance'
+            });
+        }
+
+        existing.push(record);
+        count++;
+    });
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(existing));
+
+    document.getElementById('status').textContent = `✅ ${count} customers imported! Redirecting...`;
+    document.getElementById('status').style.display = 'block';
+    setTimeout(() => { window.location.href = 'index.html'; }, 2000);
+}
+</script>
+</body>
+</html>
